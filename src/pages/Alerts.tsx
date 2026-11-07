@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BellOff, Check, CheckCheck, ClipboardCheck, FileSearch, History, MessageSquarePlus, UserPlus, Waves } from 'lucide-react';
+import { BellOff, Check, CheckCheck, ClipboardCheck, FileSearch, History, MessageSquarePlus, Send, UserPlus, Waves } from 'lucide-react';
 import type { Alert, AlertStatus, AlertType, Observation } from '@/types';
 import { useRippleStore } from '@/store/useRippleStore';
 import { can, useCurrentUser, useNow, useObservations, useVisibleAlerts } from '@/store/selectors';
@@ -125,11 +125,16 @@ function AlertDetail({ alert }: { alert: Alert }) {
   const addFollowUp = useRippleStore((s) => s.addFollowUp);
   const resolve = useRippleStore((s) => s.resolveAlert);
   const observations = useObservations();
-  const [dialog, setDialog] = useState<'assign' | 'followup' | 'resolve' | null>(null);
+  const [dialog, setDialog] = useState<'assign' | 'followup' | 'family' | 'resolve' | null>(null);
   const [assignee, setAssignee] = useState(alert.assignedTo ?? '');
   const [text, setText] = useState('');
+  const [familyText, setFamilyText] = useState('');
+  const [familyResidentId, setFamilyResidentId] = useState(alert.residentIds[0] ?? '');
   const [error, setError] = useState<string | null>(null);
   const [evidence, setEvidence] = useState<Observation[] | null>(null);
+  const familyMessages = useRippleStore((s) => s.familyMessages);
+  const recordFamilyMessage = useRippleStore((s) => s.recordFamilyMessage);
+  const alertFamilyMessages = familyMessages.filter((message) => message.alertId === alert.id);
   const resolved = alert.status === 'resolved';
   const evidenceObs = observations.filter((o) => alert.evidenceIds.includes(o.id));
 
@@ -162,6 +167,9 @@ function AlertDetail({ alert }: { alert: Alert }) {
           )}
           <Button variant="secondary" icon={<MessageSquarePlus size={16} aria-hidden="true" />} onClick={() => setDialog('followup')}>
             Add follow-up note
+          </Button>
+          <Button variant="secondary" icon={<Send size={16} aria-hidden="true" />} onClick={() => setDialog('family')}>
+            Notify family (demo)
           </Button>
           {can(role, 'resolve', alert) && (
             <Button icon={<CheckCheck size={16} aria-hidden="true" />} disabled={resolved} onClick={() => setDialog('resolve')}>
@@ -234,6 +242,20 @@ function AlertDetail({ alert }: { alert: Alert }) {
               ))}
             </ul>
           )}
+          <h3 className="mb-2 mt-5 flex items-center gap-2 text-sm font-semibold"><Send size={16} aria-hidden="true" /> Family messages (demo only) ({alertFamilyMessages.length})</h3>
+          {alertFamilyMessages.length === 0 ? (
+            <p className="text-sm text-ink-muted">No simulated family messages recorded.</p>
+          ) : (
+            <ul className="space-y-2">
+              {alertFamilyMessages.map((message) => (
+                <li key={message.id} className="rounded-lg border border-line p-3 text-sm">
+                  <p className="mb-1 text-xs font-medium text-ink-muted">{residentName(message.residentId)} · Not delivered</p>
+                  <p>{message.message}</p>
+                  <p className="mt-1 text-xs text-ink-muted">{staffName(message.authorId)} · {fmtDateTime(message.at)}</p>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
         <section>
           <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><History size={16} aria-hidden="true" /> Audit trail (demo)</h3>
@@ -283,6 +305,46 @@ function AlertDetail({ alert }: { alert: Alert }) {
             ))}
           </select>
         </Field>
+      </Dialog>
+
+      <Dialog
+        open={dialog === 'family'}
+        onClose={close}
+        title="Record a family message (demo)"
+        description="This prototype does not send email or text messages. Recording this action only saves it in this demo."
+        footer={
+          <>
+            <Button variant="secondary" onClick={close}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!familyResidentId) return setError('Choose a resident.');
+                if (familyText.trim().length < 3) return setError('Write a message (3+ characters).');
+                recordFamilyMessage(alert.id, familyResidentId, familyText);
+                setFamilyText('');
+                close();
+                toast({ title: 'Simulated family message recorded', body: 'No message was sent.' });
+              }}
+            >
+              Record simulated send
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg border border-blue-200 bg-primary-soft px-3 py-2 text-sm text-navy" role="note">
+            Demo only — no message will be sent. Do not enter real resident or family contact information.
+          </div>
+          <Field label="Resident" htmlFor="family-resident" error={error ?? undefined}>
+            <select id="family-resident" className="input" value={familyResidentId} onChange={(e) => { setFamilyResidentId(e.target.value); setError(null); }} data-autofocus>
+              {alert.residentIds.map((id) => (
+                <option key={id} value={id}>{residentName(id)} · Room {RESIDENT_BY_ID[id].room}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Message" htmlFor="family-message" hint="A demo copy will be saved to this alert's family-message log." error={error && familyText.trim().length < 3 ? error : undefined}>
+            <textarea id="family-message" className="input min-h-[140px] py-2" value={familyText} onChange={(e) => { setFamilyText(e.target.value); setError(null); }} placeholder="Write the message you would send to the family in a real system." />
+          </Field>
+        </div>
       </Dialog>
 
       <Dialog

@@ -23,6 +23,8 @@ npm run preview    # serve the production build
 
 No backend, API keys or network services are needed. Demo edits are saved to `localStorage` (key `ripple-demo-v1`), and **Demo Controls → Reset synthetic dataset** restores the exact seed.
 
+The Alerts page includes a **Notify family (demo)** workflow. It records a simulated message in the alert and audit trail; it does not send email or text messages. Do not enter real resident or family contact information.
+
 Set `VITE_DEMO_MODE=false` to hide the Demo Controls page.
 
 ## Demo walkthrough (about 5 minutes)
@@ -32,11 +34,8 @@ Open **Demo Controls** at any time to reset or load a scenario. Both scenarios a
 ### Script A: GI cluster (Head Nurse)
 1. **Demo Controls → Scenario A**. The Overview shows 48 residents monitored, 6 with new changes, 2 patterns under review and 4 pending assessments.
 2. On the *Gastrointestinal symptoms — 5 residents across 3 units* card, click **Investigate**.
-3. **Exposure comparison** shows *Harvest Lunch — Seating A*:
-   - 4 of 20 attendees symptomatic (20%) vs 1 of 26 non-attendees (3.8%).
-   - 2 residents with unknown attendance are excluded from both denominators.
-   - A small-numbers caveat is shown, and the finding is labelled *Hypothesis for review — not a cause*.
-4. Switch to **Timeline** (onsets vs the lunch) and **Relationship graph** (click a node to filter the evidence panel). Use **View source records** to see the underlying notes.
+3. The pattern graph shows the most-shared recent event and its location, with lines only to affected residents documented as attendees. Attendance is not proof of cause.
+4. Select an event or resident to filter the evidence panel, then use **View source records** to inspect the underlying notes.
 5. **Open alert & assign** → Acknowledge → **Assign to nurse** (e.g. Grace Liu) → **Add follow-up note**. Each action appears in the alert's audit trail.
 
 ### Script B: Individual behavioural change (Nurse → Assessor)

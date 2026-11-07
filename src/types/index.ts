@@ -160,6 +160,15 @@ export interface FollowUp {
   at: string;
 }
 
+export interface FamilyMessage {
+  id: string;
+  alertId: string;
+  residentId: string;
+  message: string;
+  authorId: string;
+  at: string;
+}
+
 export interface Alert {
   id: string;
   /** Stable detection key so re-analysis does not duplicate alerts. */

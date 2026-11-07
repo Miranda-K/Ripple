@@ -14,8 +14,8 @@ import { toast } from '@/store/toast';
 const SCRIPT_A = [
   'Overview shows 2 emerging patterns (Head Nurse view).',
   'Click “Investigate” on the GI pattern → 5 affected residents.',
-  'Exposure comparison: Harvest Lunch Seating A — 4/20 attendees vs 1/26 non-attendees, 2 unknown excluded.',
-  'Switch to Timeline / Relationship graph; open “View source records”.',
+  'Pattern graph: Harvest Lunch Seating A at the Main Dining Room; lines show affected residents documented as attendees.',
+  'Select the event or a resident to filter evidence; open “View source records” for the underlying notes.',
   '“Open alert & assign” → Assign follow-up to Grace Liu (Head Nurse) and add a follow-up note.',
 ];
 const SCRIPT_B = [

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Alert, Assessment, AssessmentItemResponse, AuditEvent, Note, Observation, ObservationDraft, PatternStatus, UserRole } from '@/types';
+import type { Alert, Assessment, AssessmentItemResponse, AuditEvent, FamilyMessage, Note, Observation, ObservationDraft, PatternStatus, UserRole } from '@/types';
 import { buildSeed, type SeedState } from '@/data/seed';
 import { BASE_OBSERVATIONS } from '@/data/observations';
 import { ROLE_USER, staffName } from '@/data/staff';
@@ -37,6 +37,7 @@ interface Actions {
   acknowledgeAlert: (id: string) => void;
   assignAlert: (id: string, staffId: string) => void;
   addFollowUp: (id: string, text: string) => void;
+  recordFamilyMessage: (alertId: string, residentId: string, message: string) => void;
   resolveAlert: (id: string) => void;
   markAlertRead: (id: string) => void;
   clearNotifications: () => void;
@@ -165,6 +166,27 @@ export const useRippleStore = create<RippleState>()(
             audit: [audit('Added follow-up note', 'alert', id, text.length > 80 ? `${text.slice(0, 80)}…` : text), ...s.audit],
           }));
         },
+        recordFamilyMessage: (alertId, residentId, message) => {
+          const text = message.trim();
+          const alert = get().alerts.find((a) => a.id === alertId);
+          if (!alert) throw new Error(`Cannot record family message: alert "${alertId}" was not found.`);
+          if (!alert.residentIds.includes(residentId)) throw new Error(`Cannot record family message: resident "${residentId}" is not part of alert "${alertId}".`);
+          if (text.length < 3) throw new Error('Cannot record family message: message must contain at least 3 characters.');
+
+          const at = tick();
+          const entry: FamilyMessage = {
+            id: uid('fm'),
+            alertId,
+            residentId,
+            message: text,
+            authorId: get().userId(),
+            at,
+          };
+          set((s) => ({
+            familyMessages: [entry, ...s.familyMessages],
+            audit: [audit('Recorded simulated family message', 'alert', alertId, `Demo only — message recorded for ${residentName(residentId)}; not delivered.`), ...s.audit],
+          }));
+        },
         resolveAlert: (id) => patchAlert(id, () => ({ status: 'resolved', read: true }), 'Marked reviewed (resolved)'),
         markAlertRead: (id) => set((s) => ({ alerts: s.alerts.map((a) => (a.id === id ? { ...a, read: true } : a)) })),
         clearNotifications: () => set((s) => ({ alerts: s.alerts.map((a) => ({ ...a, read: true })) })),
@@ -230,6 +252,7 @@ export const useRippleStore = create<RippleState>()(
         notes: s.notes,
         userObservations: s.userObservations,
         alerts: s.alerts,
+        familyMessages: s.familyMessages,
         assessments: s.assessments,
         audit: s.audit,
         patternStatus: s.patternStatus,

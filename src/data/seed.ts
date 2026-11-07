@@ -1,5 +1,5 @@
 // Builds the initial (resettable) demo state from deterministic fixtures.
-import type { Alert, AlertStatus, Assessment, AuditEvent, Note, Observation, PatternStatus, UserRole } from '@/types';
+import type { Alert, AlertStatus, Assessment, AuditEvent, FamilyMessage, Note, Observation, PatternStatus, UserRole } from '@/types';
 import { BASE_OBSERVATIONS } from './observations';
 import { SEED_NOTES } from './storyRecords';
 import { assessmentAlert, syncAlerts } from '@/lib/alerts';
@@ -11,6 +11,7 @@ export interface SeedState {
   notes: Note[];
   userObservations: Observation[];
   alerts: Alert[];
+  familyMessages: FamilyMessage[];
   assessments: Assessment[];
   audit: AuditEvent[];
   patternStatus: Record<string, PatternStatus>;
@@ -109,6 +110,7 @@ export function buildSeed(): SeedState {
     notes: [...SEED_NOTES].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     userObservations: [],
     alerts,
+    familyMessages: [],
     assessments,
     audit,
     patternStatus: { 'pattern-gi-facility': 'new', 'pattern-respiratory-unit-B': 'under_review' },

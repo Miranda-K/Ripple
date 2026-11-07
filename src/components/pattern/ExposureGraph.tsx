@@ -1,118 +1,203 @@
 import type { ExposureComparison, PatternCluster, ResidentExposure } from '@/types';
 import { RESIDENT_BY_ID, residentName } from '@/data/residents';
+import { fmtDateTime } from '@/lib/time';
 
-export type GraphSelection = { kind: 'resident' | 'exposure' | 'room'; id: string } | null;
+export type GraphSelection = { kind: 'resident' | 'exposure'; id: string } | null;
 
-const W = 760;
+const W = 800;
+const ROW_HEIGHT = 68;
+const EVENT_BOX = { x: 24, width: 290, height: 142 };
+const RESIDENT_BOX = { x: 500, width: 276, height: 50 };
 
-/** Deterministic three-column relationship graph: rooms/units ← residents → shared exposures. */
+function wrapText(text: string, maxLength: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let line = '';
+
+  words.forEach((word) => {
+    const next = line ? `${line} ${word}` : word;
+    if (next.length > maxLength && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  });
+  if (line) lines.push(line);
+  return lines.slice(0, 3);
+}
+
 export function ExposureGraph({
   cluster,
-  comparisons,
+  comparison,
   residentExposures,
   selection,
   onSelect,
 }: {
   cluster: PatternCluster;
-  comparisons: ExposureComparison[];
+  comparison: ExposureComparison | undefined;
   residentExposures: ResidentExposure[];
   selection: GraphSelection;
-  onSelect: (s: GraphSelection) => void;
+  onSelect: (selection: GraphSelection) => void;
 }) {
+  if (!comparison) {
+    return <p className="text-sm text-ink-muted">No shared event with documented attendees was found for this pattern.</p>;
+  }
+
   const residents = cluster.residentIds;
-  const exposures = comparisons.filter((c) => c.exposedSymptomatic >= 2).slice(0, 6).map((c) => c.exposure);
-  const rooms = [...new Set(residents.map((id) => `Unit ${RESIDENT_BY_ID[id].unit}`))].sort();
-  const rows = Math.max(residents.length, exposures.length, rooms.length);
-  const H = Math.max(280, rows * 84 + 50);
-  const colX = { room: 110, resident: 330, exposure: 540 };
-  const yFor = (i: number, n: number) => 34 + ((i + 0.5) * (H - 80)) / n;
-
-  const rPos = new Map(residents.map((id, i) => [id, yFor(i, residents.length)]));
-  const ePos = new Map(exposures.map((e, i) => [e.id, yFor(i, exposures.length)]));
-  const uPos = new Map(rooms.map((u, i) => [u, yFor(i, rooms.length)]));
-
-  const attended = new Set(residentExposures.filter((re) => re.attendance === 'attended').map((re) => `${re.exposureId}|${re.residentId}`));
-  const isSel = (kind: string, id: string) => selection?.kind === kind && selection.id === id;
-  const linkedToSel = (rid: string, other: { kind: string; id: string }) => {
-    if (!selection) return true;
-    if (selection.kind === 'resident') return selection.id === rid;
-    return selection.kind === other.kind && selection.id === other.id;
-  };
-
-  const renderNode = ({ kind, id, x, y, label, sub, shape }: { kind: 'resident' | 'exposure' | 'room'; id: string; x: number; y: number; label: string; sub?: string; shape: 'circle' | 'rect' | 'pill' }) => {
-    const sel = isSel(kind, id);
-    const toggle = () => onSelect(sel ? null : { kind, id });
-    const fill = kind === 'resident' ? '#2563EB' : kind === 'exposure' ? '#FEF3C7' : '#EFF6FF';
-    const stroke = kind === 'exposure' ? '#D97706' : '#2563EB';
-    const anchor = kind === 'room' ? 'end' : kind === 'resident' ? 'middle' : 'start';
-    const tx = kind === 'room' ? x - 22 : kind === 'resident' ? x : x + 22;
-    const ly = kind === 'resident' ? y + 32 : sub ? y - 2 : y + 4;
-    return (
-      <g
-        key={`${kind}-${id}`}
-        role="button"
-        tabIndex={0}
-        aria-pressed={sel}
-        aria-label={`${label}${sub ? `, ${sub}` : ''}. ${sel ? 'Selected. Activate to clear filter.' : 'Activate to filter evidence.'}`}
-        onClick={toggle}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            toggle();
-          }
-        }}
-        className="cursor-pointer outline-none [&:focus-visible>.ring]:opacity-100"
-      >
-        <circle className="ring" cx={x} cy={y} r={20} fill="none" stroke="#172B4D" strokeWidth={2} opacity={sel ? 1 : 0} />
-        {shape === 'circle' && <circle cx={x} cy={y} r={14} fill={fill} stroke="#fff" strokeWidth={3} />}
-        {shape === 'rect' && <rect x={x - 13} y={y - 13} width={26} height={26} rx={6} fill={fill} stroke={stroke} strokeWidth={2} />}
-        {shape === 'pill' && <rect x={x - 14} y={y - 11} width={28} height={22} rx={11} fill={fill} stroke={stroke} strokeWidth={2} />}
-        <text x={tx} y={ly} textAnchor={anchor} fontSize={13} fontWeight={600} fill="#172B4D">
-          {label}
-        </text>
-        {sub && (
-          <text x={tx} y={kind === 'resident' ? ly + 14 : y + 14} textAnchor={anchor} fontSize={11} fill="#64748B">
-            {sub}
-          </text>
-        )}
-      </g>
-    );
-  };
+  const H = Math.max(240, residents.length * ROW_HEIGHT + 24);
+  const eventY = H / 2 - EVENT_BOX.height / 2;
+  const eventCenterY = H / 2;
+  const nameLines = wrapText(comparison.exposure.name, 30);
+  const attendanceByResident = new Map(
+    residentExposures
+      .filter((record) => record.exposureId === comparison.exposure.id)
+      .map((record) => [record.residentId, record.attendance]),
+  );
+  const isSelected = (kind: 'resident' | 'exposure', id: string) => selection?.kind === kind && selection.id === id;
+  const eventSelected = isSelected('exposure', comparison.exposure.id);
+  const attendedCount = residents.filter((id) => attendanceByResident.get(id) === 'attended').length;
+  const toggleEvent = () => onSelect(eventSelected ? null : { kind: 'exposure', id: comparison.exposure.id });
 
   return (
     <div>
       <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[640px]" role="group" aria-label="Relationship graph of affected residents, their units and shared exposures">
-          <text x={colX.room} y={16} textAnchor="middle" fontSize={11} fill="#64748B" fontWeight={600} letterSpacing={1}>UNITS</text>
-          <text x={colX.resident} y={16} textAnchor="middle" fontSize={11} fill="#64748B" fontWeight={600} letterSpacing={1}>RESIDENTS</text>
-          <text x={colX.exposure + 90} y={16} textAnchor="middle" fontSize={11} fill="#64748B" fontWeight={600} letterSpacing={1}>SHARED EXPOSURES</text>
-          {residents.map((rid) => {
-            const u = `Unit ${RESIDENT_BY_ID[rid].unit}`;
-            const on = linkedToSel(rid, { kind: 'room', id: u });
-            return <line key={`u-${rid}`} x1={colX.room} y1={uPos.get(u)} x2={colX.resident} y2={rPos.get(rid)} stroke={on ? '#93C5FD' : '#E2EAF3'} strokeWidth={on ? 2 : 1.5} />;
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full min-w-[640px]"
+          role="group"
+          aria-label={`Affected residents and attendance at ${comparison.exposure.name}, ${comparison.exposure.location}`}
+        >
+          {residents.map((id, index) => {
+            if (attendanceByResident.get(id) !== 'attended') return null;
+            const centerY = 12 + index * ROW_HEIGHT + RESIDENT_BOX.height / 2;
+            return (
+              <path
+                key={`link-${id}`}
+                d={`M ${EVENT_BOX.x + EVENT_BOX.width} ${eventCenterY} C 390 ${eventCenterY}, 420 ${centerY}, ${RESIDENT_BOX.x} ${centerY}`}
+                fill="none"
+                stroke="#60A5FA"
+                strokeWidth={2}
+              />
+            );
           })}
-          {residents.flatMap((rid) =>
-            exposures
-              .filter((e) => attended.has(`${e.id}|${rid}`))
-              .map((e) => {
-                const on = linkedToSel(rid, { kind: 'exposure', id: e.id });
-                return <line key={`e-${rid}-${e.id}`} x1={colX.resident} y1={rPos.get(rid)} x2={colX.exposure} y2={ePos.get(e.id)} stroke={on ? '#D97706' : '#E2EAF3'} strokeWidth={on ? 2 : 1.5} opacity={on ? 0.8 : 1} />;
-              }),
-          )}
-          {rooms.map((u) => (
-            renderNode({ kind: 'room', id: u, x: colX.room, y: uPos.get(u)!, label: u, shape: 'pill' })
-          ))}
-          {residents.map((rid) => (
-            renderNode({ kind: 'resident', id: rid, x: colX.resident, y: rPos.get(rid)!, label: residentName(rid), sub: `Room ${RESIDENT_BY_ID[rid].room}`, shape: 'circle' })
-          ))}
-          {exposures.map((e) => {
-            const c = comparisons.find((x) => x.exposure.id === e.id)!;
-            return renderNode({ kind: 'exposure', id: e.id, x: colX.exposure, y: ePos.get(e.id)!, label: e.name.length > 24 ? `${e.name.slice(0, 23)}…` : e.name, sub: `${c.exposedSymptomatic} of ${c.exposedTotal} attendees symptomatic`, shape: 'rect' });
+
+          <g
+            role="button"
+            tabIndex={0}
+            aria-pressed={eventSelected}
+            aria-label={`${comparison.exposure.name} at ${comparison.exposure.location}. ${attendedCount} of ${residents.length} affected residents attended. Activate to filter evidence.`}
+            onClick={toggleEvent}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggleEvent();
+              }
+            }}
+            className="cursor-pointer outline-none [&:focus-visible>.focus-ring]:opacity-100"
+          >
+            <rect
+              className="focus-ring"
+              x={EVENT_BOX.x - 3}
+              y={eventY - 3}
+              width={EVENT_BOX.width + 6}
+              height={EVENT_BOX.height + 6}
+              rx={16}
+              fill="none"
+              stroke="#172B4D"
+              strokeWidth={2}
+              opacity={eventSelected ? 1 : 0}
+            />
+            <rect
+              x={EVENT_BOX.x}
+              y={eventY}
+              width={EVENT_BOX.width}
+              height={EVENT_BOX.height}
+              rx={14}
+              fill={eventSelected ? '#DBEAFE' : '#EFF6FF'}
+              stroke="#2563EB"
+              strokeWidth={eventSelected ? 3 : 2}
+            />
+            <text x={EVENT_BOX.x + 18} y={eventY + 25} fontSize={11} fontWeight={700} letterSpacing={1} fill="#1D4ED8">
+              SHARED EVENT
+            </text>
+            {nameLines.map((line, index) => (
+              <text key={`${index}-${line}`} x={EVENT_BOX.x + 18} y={eventY + 51 + index * 19} fontSize={14} fontWeight={600} fill="#172B4D">
+                {line}
+              </text>
+            ))}
+            <text x={EVENT_BOX.x + 18} y={eventY + 111} fontSize={12} fill="#475569">
+              {comparison.exposure.location}
+            </text>
+            <text x={EVENT_BOX.x + 18} y={eventY + 129} fontSize={11} fill="#64748B">
+              {fmtDateTime(comparison.exposure.start)}
+            </text>
+          </g>
+
+          {residents.map((id, index) => {
+            const resident = RESIDENT_BY_ID[id];
+            const centerY = 12 + index * ROW_HEIGHT + RESIDENT_BOX.height / 2;
+            const attendance = attendanceByResident.get(id) ?? 'unknown';
+            const selected = isSelected('resident', id);
+            const toggleResident = () => onSelect(selected ? null : { kind: 'resident', id });
+            const status = attendance === 'attended'
+              ? 'Attended'
+              : attendance === 'absent'
+                ? 'Did not attend'
+                : 'Attendance unknown';
+            const statusColor = attendance === 'attended' ? '#1D4ED8' : attendance === 'absent' ? '#64748B' : '#B45309';
+
+            return (
+              <g
+                key={id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selected}
+                aria-label={`${residentName(id)}, Room ${resident.room}. ${status}. Activate to filter evidence.`}
+                onClick={toggleResident}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    toggleResident();
+                  }
+                }}
+                className="cursor-pointer outline-none [&:focus-visible>.focus-ring]:opacity-100"
+              >
+                <rect
+                  className="focus-ring"
+                  x={RESIDENT_BOX.x - 3}
+                  y={centerY - RESIDENT_BOX.height / 2 - 3}
+                  width={RESIDENT_BOX.width + 6}
+                  height={RESIDENT_BOX.height + 6}
+                  rx={12}
+                  fill="none"
+                  stroke="#172B4D"
+                  strokeWidth={2}
+                  opacity={selected ? 1 : 0}
+                />
+                <rect
+                  x={RESIDENT_BOX.x}
+                  y={centerY - RESIDENT_BOX.height / 2}
+                  width={RESIDENT_BOX.width}
+                  height={RESIDENT_BOX.height}
+                  rx={10}
+                  fill={selected ? '#DBEAFE' : '#FFFFFF'}
+                  stroke={selected ? '#2563EB' : '#CBD5E1'}
+                  strokeWidth={selected ? 2 : 1}
+                />
+                <text x={RESIDENT_BOX.x + 16} y={centerY - 2} fontSize={14} fontWeight={600} fill="#172B4D">
+                  {residentName(id)}
+                </text>
+                <text x={RESIDENT_BOX.x + 16} y={centerY + 15} fontSize={11} fill={statusColor}>
+                  Room {resident.room} · {status}
+                </text>
+              </g>
+            );
           })}
         </svg>
       </div>
       <p className="mt-2 text-xs text-ink-muted">
-        Shows exposures attended by 2 or more affected residents. Select any node to filter the evidence panel; select it again to clear. Lines show documented attendance or unit residence — not transmission.
+        Lines connect residents documented as attending this event ({attendedCount} of {residents.length}). The event is a hypothesis for review, not evidence of cause. Select a resident or the event to filter the evidence panel.
       </p>
     </div>
   );

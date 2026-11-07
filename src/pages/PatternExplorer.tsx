@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BellRing, FileSearch, GitBranch, Rows3, Scale, Waves, X } from 'lucide-react';
+import { BellRing, FileSearch, Waves, X } from 'lucide-react';
 import type { Observation, PatternStatus } from '@/types';
 import { useRippleStore } from '@/store/useRippleStore';
 import { useAnalysis, useCurrentUser } from '@/store/selectors';
@@ -11,17 +11,12 @@ import { fmtDateTime, parse, DEMO_NOW } from '@/lib/time';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
-import { Tabs, TabPanel } from '@/components/ui/Tabs';
 import { Caveat, EmptyState, PageHeader, Select, Skeleton } from '@/components/ui/misc';
 import { PatternStatusBadge, PATTERN_STATUS_LABEL, ObservationBadge, SourceChip } from '@/components/badges';
 import { UnitDistribution } from '@/components/cards';
-import { PatternTimeline } from '@/components/pattern/PatternTimeline';
-import { ExposureComparisonView } from '@/components/pattern/ExposureComparisonView';
 import { ExposureGraph, type GraphSelection } from '@/components/pattern/ExposureGraph';
 import { EvidenceDrawer } from '@/components/EvidenceDrawer';
 import { useSimulatedLoading } from '@/hooks/useSimulatedLoading';
-
-type View = 'timeline' | 'exposure' | 'graph';
 
 export default function PatternExplorer() {
   const loading = useSimulatedLoading(300);
@@ -36,7 +31,6 @@ export default function PatternExplorer() {
   const domain = params.get('domain') ?? 'all';
   const unit = params.get('unit') ?? 'all';
   const status = params.get('status') ?? 'all';
-  const view = (params.get('view') as View) ?? 'exposure';
   const setParam = (k: string, v: string | null) => {
     const next = new URLSearchParams(params);
     if (v === null || v === 'all') next.delete(k);
@@ -55,8 +49,6 @@ export default function PatternExplorer() {
   const cluster = filtered.find((c) => c.id === selectedId) ?? filtered[0];
 
   const comparisons = useMemo(() => (cluster ? exposureComparisons(cluster, EXPOSURES, RESIDENT_EXPOSURES, RESIDENTS) : []), [cluster]);
-  const focusId = params.get('exposure') ?? comparisons[0]?.exposure.id;
-  const focus = focusId ? EXPOSURE_BY_ID[focusId] : undefined;
   const [selection, setSelection] = useState<GraphSelection>(null);
   const [drawer, setDrawer] = useState<{ title: string; obs: Observation[] } | null>(null);
 
@@ -78,15 +70,12 @@ export default function PatternExplorer() {
   const evidence = evidenceAll.filter((o) => {
     if (!selection) return true;
     if (selection.kind === 'resident') return o.residentId === selection.id;
-    if (selection.kind === 'room') return `Unit ${RESIDENT_BY_ID[o.residentId].unit}` === selection.id;
     return RESIDENT_EXPOSURES.some((re) => re.exposureId === selection.id && re.residentId === o.residentId && re.attendance === 'attended');
   });
   const selectionLabel = selection
     ? selection.kind === 'resident'
       ? residentName(selection.id)
-      : selection.kind === 'room'
-        ? selection.id
-        : EXPOSURE_BY_ID[selection.id]?.name
+      : EXPOSURE_BY_ID[selection.id]?.name
     : null;
   const alert = cluster && alerts.find((a) => a.patternId === cluster.id && a.status !== 'resolved');
   const missing = cluster ? residentsMissing(observations, RESIDENTS, cluster.domain).length : 0;
@@ -212,45 +201,8 @@ export default function PatternExplorer() {
                   ))}
                 </div>
               </div>
-              <div className="px-5 md:px-6">
-                <Tabs<View>
-                  label="Pattern views"
-                  value={view}
-                  onChange={(v) => setParam('view', v === 'exposure' ? null : v)}
-                  tabs={[
-                    { id: 'timeline', label: <><Rows3 size={16} aria-hidden="true" /> Timeline</> },
-                    { id: 'exposure', label: <><Scale size={16} aria-hidden="true" /> Exposure comparison</> },
-                    { id: 'graph', label: <><GitBranch size={16} aria-hidden="true" /> Relationship graph</> },
-                  ]}
-                />
-              </div>
               <div className="p-5 md:p-6">
-                {view === 'timeline' && (
-                  <TabPanel id="timeline">
-                    <PatternTimeline cluster={cluster} observations={observations} focusExposure={focus} onSelectResident={(id) => setSelection({ kind: 'resident', id })} />
-                  </TabPanel>
-                )}
-                {view === 'exposure' && (
-                  <TabPanel id="exposure">
-                    <ExposureComparisonView
-                      comparisons={comparisons}
-                      focusId={focusId}
-                      domainLabel={domainLabel}
-                      onFocus={(id) => setParam('exposure', id)}
-                      onViewSources={(c) =>
-                        setDrawer({
-                          title: `${c.exposure.name} — symptomatic attendees`,
-                          obs: evidenceAll.filter((o) => RESIDENT_EXPOSURES.some((re) => re.exposureId === c.exposure.id && re.residentId === o.residentId)),
-                        })
-                      }
-                    />
-                  </TabPanel>
-                )}
-                {view === 'graph' && (
-                  <TabPanel id="graph">
-                    <ExposureGraph cluster={cluster} comparisons={comparisons} residentExposures={RESIDENT_EXPOSURES} selection={selection} onSelect={setSelection} />
-                  </TabPanel>
-                )}
+                <ExposureGraph cluster={cluster} comparison={comparisons[0]} residentExposures={RESIDENT_EXPOSURES} selection={selection} onSelect={setSelection} />
               </div>
             </Card>
           )}
