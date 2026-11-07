@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-font-smoothing: antialiased; }
+  body { @apply bg-canvas text-ink font-sans text-[15px] leading-relaxed; }
+  h1, h2, h3, h4 { @apply text-ink font-semibold tracking-tight; }
+  :focus-visible { outline: 3px solid #2563EB; outline-offset: 2px; border-radius: 6px; }
+  ::selection { background: #DBEAFE; }
+}
+
+@layer components {
+  .card { @apply bg-white rounded-card border border-line shadow-card; }
+  .card-pad { @apply p-5 md:p-6; }
+  .label { @apply text-xs font-semibold uppercase tracking-wider text-ink-muted; }
+  .input {
+    @apply w-full min-h-[44px] rounded-lg border border-line bg-white px-3 text-[15px] text-ink placeholder:text-ink-faint
+      focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-ring;
+  }
+  .table-th { @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted; }
+  .table-td { @apply px-4 py-3 align-middle; }
+  .skeleton { @apply animate-pulse rounded-md bg-slate-200/70; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
