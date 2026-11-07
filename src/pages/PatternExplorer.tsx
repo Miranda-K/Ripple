@@ -96,7 +96,7 @@ export default function PatternExplorer() {
     <div>
       <PageHeader
         title="Pattern Explorer"
-        subtitle="Cross-resident groupings of new symptoms, with exposure comparisons that use full denominators. Every insight is a hypothesis for clinical review."
+        subtitle="New symptom groups and possible shared exposures. For review, not proof of cause."
       />
 
       <Card className="mb-6 p-4">

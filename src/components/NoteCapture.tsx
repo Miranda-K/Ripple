@@ -128,7 +128,7 @@ export function NoteCapture({ initialResident, initialScript }: { initialResiden
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <Card>
-        <CardHeader title="1 · Capture" subtitle="Dictate or type what you observed. Nothing is saved until you confirm." />
+        <CardHeader title="1 · Capture" subtitle="Type or dictate. Nothing saves until confirmed." />
         <div className="space-y-5 p-5 md:p-6">
           <Field label="Resident" htmlFor="note-resident" error={errors.resident}>
             <select id="note-resident" className="input" value={residentId} onChange={(e) => { setResidentId(e.target.value); setDrafts(null); }} aria-invalid={!!errors.resident}>
@@ -152,11 +152,11 @@ export function NoteCapture({ initialResident, initialScript }: { initialResiden
               {listening ? <MicOff size={30} /> : <Mic size={30} />}
             </button>
             <p className="text-sm font-medium">{listening ? 'Listening… tap to stop' : supported ? 'Tap to dictate' : 'Voice input is not supported in this browser'}</p>
-            <p className="text-xs text-ink-muted">{supported ? 'Uses your browser’s speech recognition. Review the transcript before extracting.' : 'Use the typed transcript below — the workflow is identical.'}</p>
+            <p className="text-xs text-ink-muted">{supported ? 'Review the transcript before extracting.' : 'Use the text box below.'}</p>
             {speechError && <p className="text-xs font-medium text-urgent-ink" role="alert">{speechError}</p>}
           </div>
 
-          <Field label="Transcript" htmlFor="note-text" error={errors.text} hint="Edit freely. The original dictated text is preserved alongside your edits.">
+          <Field label="Note" htmlFor="note-text" error={errors.text} hint="Edit as needed; the original is kept.">
             <textarea
               id="note-text"
               className="input min-h-[150px] py-3 leading-relaxed"
@@ -168,7 +168,7 @@ export function NoteCapture({ initialResident, initialScript }: { initialResiden
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Event time (when observed)" htmlFor="note-time" hint="Relative phrases like “overnight” are resolved against this.">
+            <Field label="Observed at" htmlFor="note-time" hint="Used to interpret times like “overnight.”">
               <input id="note-time" type="datetime-local" className="input" value={toInputValue(eventTime)} onChange={(e) => { setEventTime(fromInputValue(e.target.value)); setDrafts(null); }} />
             </Field>
             <Field label="Author" htmlFor="note-author">
@@ -177,7 +177,7 @@ export function NoteCapture({ initialResident, initialScript }: { initialResiden
           </div>
 
           <div>
-            <p className="mb-2 text-xs font-medium text-ink-muted">Demo scripts (deterministic extraction)</p>
+            <p className="mb-2 text-xs font-medium text-ink-muted">Demo scripts</p>
             <div className="flex flex-wrap gap-2">
               {DEMO_SCRIPTS.map((s) => (
                 <button key={s.id} onClick={() => loadScript(s.id)} className="min-h-[36px] rounded-full border border-line bg-white px-3 text-sm hover:border-primary hover:text-primary">
@@ -188,7 +188,7 @@ export function NoteCapture({ initialResident, initialScript }: { initialResiden
           </div>
 
           <Button size="lg" className="w-full" onClick={extract} icon={<Wand2 size={18} aria-hidden="true" />}>
-            Extract observations
+            Extract
           </Button>
         </div>
       </Card>
@@ -198,10 +198,10 @@ export function NoteCapture({ initialResident, initialScript }: { initialResiden
         <div className="p-5 md:p-6">
           {drafts === null ? (
             <div className="rounded-xl border border-dashed border-line p-8 text-center text-sm text-ink-muted">
-              Extracted observations will appear here for review. This demo uses a deterministic, rule-based extractor (no AI model or API key required).
+              Extracted items will appear here.
             </div>
           ) : drafts.length === 0 ? (
-            <Caveat>No observations were recognised. You can still save the note as free text, or add detail and extract again.</Caveat>
+            <Caveat>No items found. Save the note or add detail and try again.</Caveat>
           ) : (
             <ul className="space-y-3">
               {drafts.map((d) => (

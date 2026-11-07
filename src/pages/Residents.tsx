@@ -147,10 +147,10 @@ export default function Residents() {
 
   return (
     <div>
-      <PageHeader title="Residents" subtitle={`${RESIDENTS.length} residents monitored across Units A–D. Indicators compare documented observations with each resident’s own baseline.`} />
+      <PageHeader title="Residents" subtitle={`${RESIDENTS.length} residents · Changes compared with each person’s baseline.`} />
       <Card>
         <div className="grid gap-3 border-b border-line p-4 md:grid-cols-[1fr_180px_260px_auto] md:items-end md:p-5">
-          <SearchInput value={q} onChange={(v) => set('q', v)} label="Search by name, resident ID or room" placeholder="Search name, ID (R-1004) or room…" />
+          <SearchInput value={q} onChange={(v) => set('q', v)} label="Search residents" placeholder="Name, ID or room…" />
           <Select label="Unit" value={unit} onChange={(e) => set('unit', e.target.value)}>
             <option value="all">All units</option>
             {['A', 'B', 'C', 'D'].map((u) => (

@@ -28,14 +28,14 @@ export default function CareNotes() {
 
   return (
     <div>
-      <PageHeader title="Care Notes" subtitle="Capture observations by voice or text, review the structured extraction, and confirm before anything is added to the record." />
+      <PageHeader title="Care notes" subtitle="Add a note by voice or text. Review before saving." />
       <Tabs<Tab>
         label="Care notes"
         value={tab}
         onChange={(t) => setParams(t === 'add' ? {} : { tab: t }, { replace: true })}
         tabs={[
-          { id: 'add', label: 'Add Note' },
-          { id: 'history', label: 'Note History', count: notes.length },
+          { id: 'add', label: 'Add note' },
+          { id: 'history', label: 'History', count: notes.length },
         ]}
       />
       {tab === 'add' && (

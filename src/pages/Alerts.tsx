@@ -45,12 +45,12 @@ export default function Alerts() {
   }, [selected, markRead]);
 
   const scopeText =
-    role === 'head_nurse' ? 'Facility-wide queue (all units).' : role === 'nurse' ? 'Alerts assigned to you or about Unit A residents.' : 'Assessment requests and items assigned to you.';
+    role === 'head_nurse' ? 'All units.' : role === 'nurse' ? 'Your alerts and Unit A.' : 'Your requests.';
   const count = (s: StatusFilter) => byType.filter((a) => s === 'all' || a.status === s).length;
 
   return (
     <div>
-      <PageHeader title="Alerts" subtitle={`${scopeText} Each alert explains why it was raised and what is uncertain. No severity scores are assigned.`} />
+      <PageHeader title="Alerts" subtitle={`${scopeText} Each alert explains why. No severity scores.`} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0 flex-1">
           <Tabs<StatusFilter>

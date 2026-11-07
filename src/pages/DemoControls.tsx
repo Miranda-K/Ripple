@@ -57,19 +57,19 @@ export default function DemoControls() {
     <div>
       <PageHeader
         eyebrow={<DemoDataBadge />}
-        title="Demo Controls"
-        subtitle="Deterministic controls for presenting Ripple. Every action works offline, without API keys, and resets reproducibly."
+        title="Demo controls"
+        subtitle="Reset data or load a scenario."
       />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader title="Dataset" subtitle={`Current: ${scenario === 'base' ? 'base seed' : `Scenario ${scenario}`} · role ${ROLE_LABEL[role]}`} icon={<FlaskConical size={18} aria-hidden="true" />} />
           <div className="grid gap-3 p-5 sm:grid-cols-2 md:p-6">
-            <Button variant="secondary" size="lg" icon={<RotateCcw size={18} aria-hidden="true" />} onClick={() => setConfirm('reset')}>Reset synthetic dataset</Button>
+            <Button variant="secondary" size="lg" icon={<RotateCcw size={18} aria-hidden="true" />} onClick={() => setConfirm('reset')}>Reset data</Button>
             <Button variant="secondary" size="lg" icon={<BellOff size={18} aria-hidden="true" />} onClick={() => { clear(); toast({ title: 'Notifications cleared' }); }}>Clear notifications</Button>
-            <Button size="lg" icon={<Utensils size={18} aria-hidden="true" />} onClick={() => setConfirm('A')}>Scenario A — GI cluster</Button>
-            <Button size="lg" icon={<Brain size={18} aria-hidden="true" />} onClick={() => setConfirm('B')}>Scenario B — Behavioural change</Button>
+            <Button size="lg" icon={<Utensils size={18} aria-hidden="true" />} onClick={() => setConfirm('A')}>Scenario A — GI pattern</Button>
+            <Button size="lg" icon={<Brain size={18} aria-hidden="true" />} onClick={() => setConfirm('B')}>Scenario B — Behaviour change</Button>
             <Button variant="subtle" size="lg" className="sm:col-span-2" icon={<NotebookPen size={18} aria-hidden="true" />} onClick={() => navigate('/notes?resident=R-1004&script=margaret')}>
-              Add live note (Margaret script)
+              Add sample note
             </Button>
           </div>
           <div className="px-5 pb-5 md:px-6 md:pb-6">
@@ -78,7 +78,7 @@ export default function DemoControls() {
         </Card>
 
         <Card>
-          <CardHeader title="Recent activity (audit trail)" subtitle="Last 8 recorded actions" />
+          <CardHeader title="Recent activity" subtitle="Last 8 actions" />
           <ol className="divide-y divide-line">
             {audit.slice(0, 8).map((e) => (
               <li key={e.id} className="px-5 py-3 text-sm md:px-6">

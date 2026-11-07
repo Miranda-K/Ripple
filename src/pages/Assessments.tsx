@@ -29,7 +29,7 @@ export default function Assessments() {
 
   return (
     <div>
-      <PageHeader title="Assessments" subtitle="Behavioural review queue for assessors and nurses. Uses DOS-inspired observation categories as labels only — this is not the validated DOS scale and no clinical score is computed." />
+      <PageHeader title="Assessments" subtitle="Behavioural reviews · Labels only, not a validated scale." />
       <Tabs<Filter>
         label="Assessment status"
         value={filter}
