@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BellRing, FileSearch, Waves, X } from 'lucide-react';
+import { BellRing, CheckCircle2, FileSearch, Waves, X } from 'lucide-react';
 import type { Observation, PatternStatus } from '@/types';
 import { useRippleStore } from '@/store/useRippleStore';
 import { useAnalysis, useCurrentUser } from '@/store/selectors';
@@ -11,7 +11,8 @@ import { fmtDateTime, parse, DEMO_NOW } from '@/lib/time';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
-import { Caveat, EmptyState, PageHeader, Select, Skeleton } from '@/components/ui/misc';
+import { Dialog } from '@/components/ui/Dialog';
+import { Caveat, EmptyState, Field, PageHeader, Select, Skeleton } from '@/components/ui/misc';
 import { PatternStatusBadge, PATTERN_STATUS_LABEL, ObservationBadge, SourceChip } from '@/components/badges';
 import { UnitDistribution } from '@/components/cards';
 import { ExposureGraph, type GraphSelection } from '@/components/pattern/ExposureGraph';
@@ -25,7 +26,11 @@ export default function PatternExplorer() {
   const { observations, clusters } = useAnalysis();
   const patternStatus = useRippleStore((s) => s.patternStatus);
   const setPatternStatus = useRippleStore((s) => s.setPatternStatus);
+  const markResidentRecovered = useRippleStore((s) => s.markResidentRecovered);
   const alerts = useRippleStore((s) => s.alerts);
+  const [recoveringResidentId, setRecoveringResidentId] = useState<string | null>(null);
+  const [recoveryNote, setRecoveryNote] = useState('');
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
 
   const range = Number(params.get('range') ?? 7);
   const domain = params.get('domain') ?? 'all';
@@ -80,6 +85,12 @@ export default function PatternExplorer() {
   const alert = cluster && alerts.find((a) => a.patternId === cluster.id && a.status !== 'resolved');
   const missing = cluster ? residentsMissing(observations, RESIDENTS, cluster.domain).length : 0;
   const domainLabel = cluster?.domain === 'gi' ? 'GI' : 'respiratory';
+  const topComparison = comparisons[0];
+  const affectedAttendees = cluster && topComparison
+    ? cluster.residentIds.filter((id) =>
+        RESIDENT_EXPOSURES.some((record) => record.exposureId === topComparison.exposure.id && record.residentId === id && record.attendance === 'attended'),
+      )
+    : [];
 
   return (
     <div>
@@ -195,14 +206,66 @@ export default function PatternExplorer() {
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2" aria-label="Affected residents">
                   {cluster.residentIds.map((id) => (
-                    <Link key={id} to={`/residents/${id}?tab=timeline`} className="rounded-full border border-line bg-canvas px-3 py-1 text-sm font-medium hover:border-primary hover:text-primary">
-                      {residentName(id)} <span className="text-ink-muted">· {RESIDENT_BY_ID[id].room}</span>
-                    </Link>
+                    <span key={id} className="inline-flex items-center gap-1 rounded-full border border-line bg-canvas p-1 pl-3">
+                      <Link to={`/residents/${id}?tab=timeline`} className="text-sm font-medium hover:text-primary">
+                        {residentName(id)} <span className="text-ink-muted">· {RESIDENT_BY_ID[id].room}</span>
+                      </Link>
+                      {(role === 'nurse' || role === 'head_nurse') && (
+                        <Button size="sm" variant="subtle" icon={<CheckCircle2 size={14} aria-hidden="true" />} onClick={() => { setRecoveringResidentId(id); setRecoveryNote(''); setRecoveryError(null); }}>
+                          Mark recovered
+                        </Button>
+                      )}
+                    </span>
                   ))}
                 </div>
               </div>
               <div className="p-5 md:p-6">
-                <ExposureGraph cluster={cluster} comparison={comparisons[0]} residentExposures={RESIDENT_EXPOSURES} selection={selection} onSelect={setSelection} />
+                <ExposureGraph cluster={cluster} comparison={topComparison} residentExposures={RESIDENT_EXPOSURES} selection={selection} onSelect={setSelection} />
+                {topComparison && (
+                  <section aria-labelledby="pattern-suggestions-title" className="mt-6 border-t border-line pt-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 id="pattern-suggestions-title" className="text-base font-semibold">Suggested review steps</h3>
+                      <Badge tone="outline">Rule-based demo</Badge>
+                    </div>
+                    <p className="mt-2 rounded-lg bg-canvas p-3 text-sm leading-relaxed text-ink-muted">
+                      The leading documented exposure is <strong className="text-ink">{topComparison.exposure.name}</strong> at {topComparison.exposure.location}.
+                      {' '}{topComparison.exposedSymptomatic}/{topComparison.exposedTotal} affected residents with documented attendance, compared with {topComparison.unexposedSymptomatic}/{topComparison.unexposedTotal} documented non-attendees; {topComparison.unknownTotal} attendance records are unknown.
+                      {' '}This is a signal to review, not proof of cause.
+                    </p>
+                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                      <div className="rounded-lg border border-line p-4">
+                        <h4 className="text-sm font-semibold">Affected residents who attended</h4>
+                        {affectedAttendees.length > 0 ? (
+                          <ul className="mt-2 space-y-2">
+                            {affectedAttendees.map((id) => (
+                              <li key={id}>
+                                <Link to={`/residents/${id}?tab=timeline`} className="text-sm font-medium text-primary underline-offset-2 hover:underline">
+                                  {residentName(id)} · Room {RESIDENT_BY_ID[id].room}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-2 text-sm text-ink-muted">No affected residents have documented attendance for this event.</p>
+                        )}
+                      </div>
+                      <div className="rounded-lg border border-line p-4">
+                        <h4 className="text-sm font-semibold">What to review</h4>
+                        <ul className="mt-2 list-disc space-y-2 pl-5 text-sm leading-relaxed">
+                          <li>Confirm event details and attendance. Follow up on unknown records.</li>
+                          <li>Continue routine symptom checks and document changes per facility protocol.</li>
+                          <li>For a meal, ask the dietary or food-safety lead to review menu and preparation records.</li>
+                          <li>Share the pattern with the clinical or infection-prevention lead.</li>
+                        </ul>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <Caveat tone="info">
+                        Rule-based demo prompts, not AI or clinical advice. This comparison does not establish cause or authorize isolation or menu changes.
+                      </Caveat>
+                    </div>
+                  </section>
+                )}
               </div>
             </Card>
           )}
@@ -265,6 +328,40 @@ export default function PatternExplorer() {
           )}
         </aside>
       </div>
+      <Dialog
+        open={!!recoveringResidentId}
+        onClose={() => { setRecoveringResidentId(null); setRecoveryError(null); }}
+        title="Record resident recovery?"
+        description="This records that the resident's symptoms in this pattern have returned to their usual baseline. Their original observations remain in the record; symptoms documented after this time can count as a new onset."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setRecoveringResidentId(null); setRecoveryError(null); }}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!recoveringResidentId || !cluster) return;
+                try {
+                  markResidentRecovered(recoveringResidentId, cluster.domain, cluster.id, recoveryNote);
+                  setRecoveringResidentId(null);
+                  setRecoveryNote('');
+                  setRecoveryError(null);
+                  setSelection(null);
+                } catch (error) {
+                  setRecoveryError(error instanceof Error ? error.message : 'Could not record recovery.');
+                }
+              }}
+            >
+              Confirm recovery
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm font-medium">{recoveringResidentId ? residentName(recoveringResidentId) : ''} · {cluster?.domain === 'gi' ? 'Gastrointestinal' : 'Respiratory'} symptoms</p>
+          <Field label="Optional note" htmlFor="recovery-note" hint="This note is kept in the pattern audit trail." error={recoveryError ?? undefined}>
+            <textarea id="recovery-note" className="input min-h-[88px] py-2" value={recoveryNote} onChange={(event) => { setRecoveryNote(event.target.value); setRecoveryError(null); }} placeholder="Add brief context for the care team." data-autofocus />
+          </Field>
+        </div>
+      </Dialog>
       <EvidenceDrawer open={!!drawer} onClose={() => setDrawer(null)} title={drawer?.title ?? ''} observations={drawer?.obs ?? []} />
     </div>
   );

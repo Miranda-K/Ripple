@@ -1,5 +1,5 @@
 // Turn deterministic detections into reviewable alerts (pure functions).
-import type { Alert, Assessment, IndividualChange, Observation, PatternCluster } from '@/types';
+import type { Alert, Assessment, IndividualChange, Observation, PatternCluster, RecoveryRecord } from '@/types';
 import { RESIDENT_BY_ID, RESIDENTS, residentName } from '@/data/residents';
 import { EXPOSURES, RESIDENT_EXPOSURES } from '@/data/exposures';
 import { CATEGORY_LABEL, completeness, detectClusters, detectIndividualChanges, exposureComparisons, residentsMissing, RULES } from './analytics';
@@ -82,9 +82,15 @@ export interface SyncResult {
 }
 
 /** Reconcile current detections with stored alerts without duplicating. */
-export function syncAlerts(existing: Alert[], observations: Observation[], now: string, newId: () => string): SyncResult {
+export function syncAlerts(
+  existing: Alert[],
+  observations: Observation[],
+  now: string,
+  newId: () => string,
+  recoveryRecords: RecoveryRecord[] = [],
+): SyncResult {
   const changes = detectIndividualChanges(observations, RESIDENTS, now);
-  const clusters = detectClusters(observations, RESIDENTS, now);
+  const clusters = detectClusters(observations, RESIDENTS, now, recoveryRecords);
   const drafts = [...changes.map((c) => individualAlert(c, observations, now)), ...clusters.map((c) => patternAlert(c, observations, now))];
   const alerts = [...existing];
   const created: Alert[] = [];
@@ -92,7 +98,7 @@ export function syncAlerts(existing: Alert[], observations: Observation[], now: 
   for (const d of drafts) {
     const idx = alerts.findIndex((a) => a.key === d.key && a.status !== 'resolved');
     if (idx === -1) {
-      if (alerts.some((a) => a.key === d.key && a.status === 'resolved' && a.evidenceIds.length >= d.evidenceIds.length)) continue;
+      if (alerts.some((a) => a.key === d.key && a.status === 'resolved' && a.firstObservedAt >= d.firstObservedAt && a.evidenceIds.length >= d.evidenceIds.length)) continue;
       const alert: Alert = { ...d, id: newId(), status: 'new', read: false, followUps: [], createdAt: now };
       alerts.unshift(alert);
       created.push(alert);

@@ -19,14 +19,14 @@ export function useNow(): string {
 export function useAnalysis() {
   const observations = useObservations();
   const now = useNow();
+  const recoveryRecords = useRippleStore((s) => s.recoveryRecords);
   return useMemo(
     () => ({
       observations,
       changes: detectIndividualChanges(observations, RESIDENTS, now),
-      clusters: detectClusters(observations, RESIDENTS, now),
+      clusters: detectClusters(observations, RESIDENTS, now, recoveryRecords),
     }),
-    // Analysis is a function of the documented observations; the clock only advances minutes.
-    [observations],
+    [observations, now, recoveryRecords],
   );
 }
 

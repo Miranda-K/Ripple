@@ -119,7 +119,7 @@ export default function Alerts() {
 function AlertDetail({ alert }: { alert: Alert }) {
   const { role } = useCurrentUser();
   const allAudit = useRippleStore((s) => s.audit);
-  const audit = allAudit.filter((e) => e.targetId === alert.id || (alert.assessmentId && e.targetId === alert.assessmentId));
+  const audit = allAudit.filter((e) => e.targetId === alert.id || (alert.assessmentId && e.targetId === alert.assessmentId) || (alert.patternId && e.targetId === alert.patternId));
   const acknowledge = useRippleStore((s) => s.acknowledgeAlert);
   const assign = useRippleStore((s) => s.assignAlert);
   const addFollowUp = useRippleStore((s) => s.addFollowUp);

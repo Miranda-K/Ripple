@@ -169,6 +169,15 @@ export interface FamilyMessage {
   at: string;
 }
 
+export interface RecoveryRecord {
+  id: string;
+  residentId: string;
+  domain: 'gi' | 'respiratory';
+  recoveredAt: string;
+  recordedBy: string;
+  note?: string;
+}
+
 export interface Alert {
   id: string;
   /** Stable detection key so re-analysis does not duplicate alerts. */

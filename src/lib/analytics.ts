@@ -7,6 +7,7 @@ import type {
   Observation,
   ObservationCategory,
   PatternCluster,
+  RecoveryRecord,
   Resident,
   ResidentExposure,
   UnitId,
@@ -107,12 +108,23 @@ export interface Onset {
 }
 
 /** First documented change in a domain within the lookback, with no change in the 7 days before it. */
-export function symptomOnsets(observations: Observation[], domain: ObservationCategory, now: string = DEMO_NOW, lookbackDays = 7): Onset[] {
+export function symptomOnsets(
+  observations: Observation[],
+  domain: ObservationCategory,
+  now: string = DEMO_NOW,
+  lookbackDays = 7,
+  recoveryRecords: RecoveryRecord[] = [],
+): Onset[] {
   const grouped = byResident(observations.filter((o) => o.category === domain && o.flag === 'change' && isPast(o, now)));
   const out: Onset[] = [];
   const start = parse(now) - lookbackDays * 86_400_000;
   for (const [residentId, list] of grouped) {
-    const sorted = [...list].sort((a, b) => a.observedAt.localeCompare(b.observedAt));
+    const latestRecovery = recoveryRecords
+      .filter((record) => record.residentId === residentId && record.domain === domain)
+      .reduce<string | null>((latest, record) => (latest === null || record.recoveredAt > latest ? record.recoveredAt : latest), null);
+    const sorted = [...list]
+      .filter((observation) => !latestRecovery || observation.observedAt > latestRecovery)
+      .sort((a, b) => a.observedAt.localeCompare(b.observedAt));
     for (const o of sorted) {
       const t = parse(o.observedAt);
       if (t < start) continue;
@@ -140,11 +152,23 @@ function bestWindow(onsets: Onset[]): Onset[] {
 
 const DOMAIN_TITLE: Record<'gi' | 'respiratory', string> = { gi: 'Gastrointestinal symptoms', respiratory: 'Respiratory symptoms' };
 
-export function detectClusters(observations: Observation[], residents: Resident[], now: string = DEMO_NOW): PatternCluster[] {
+export function detectClusters(
+  observations: Observation[],
+  residents: Resident[],
+  now: string = DEMO_NOW,
+  recoveryRecords: RecoveryRecord[] = [],
+): PatternCluster[] {
   const unitOf = new Map(residents.map((r) => [r.id, r.unit]));
   const out: PatternCluster[] = [];
   for (const domain of ['gi', 'respiratory'] as const) {
-    const onsets = symptomOnsets(observations, domain, now);
+    const onsets = symptomOnsets(observations, domain, now, 7, recoveryRecords);
+    const latestRecoveryByResident = new Map<string, string>();
+    recoveryRecords
+      .filter((record) => record.domain === domain)
+      .forEach((record) => {
+        const previous = latestRecoveryByResident.get(record.residentId);
+        if (!previous || record.recoveredAt > previous) latestRecoveryByResident.set(record.residentId, record.recoveredAt);
+      });
     const used = new Set<string>();
     const make = (group: Onset[], scope: PatternCluster['scope']) => {
       const ids = group.map((g) => g.residentId);
@@ -155,7 +179,12 @@ export function detectClusters(observations: Observation[], residents: Resident[
       });
       const unitsInvolved = UNITS.filter((u) => dist[u] > 0).length;
       const evidence = observations.filter(
-        (o) => ids.includes(o.residentId) && (o.category === domain || o.category === 'fever') && o.flag === 'change' && withinHours(o.observedAt, 7 * 24, now),
+        (o) =>
+          ids.includes(o.residentId) &&
+          (o.category === domain || o.category === 'fever') &&
+          o.flag === 'change' &&
+          (!latestRecoveryByResident.has(o.residentId) || o.observedAt > latestRecoveryByResident.get(o.residentId)!) &&
+          withinHours(o.observedAt, 7 * 24, now),
       );
       out.push({
         id: `pattern-${domain}-${scope === 'facility' ? 'facility' : `unit-${scope}`}`,

@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { BASE_OBSERVATIONS } from '@/data/observations';
 import { RESIDENTS, STORY } from '@/data/residents';
 import { EXPOSURES, HARVEST_LUNCH_ID, RESIDENT_EXPOSURES } from '@/data/exposures';
-import { completeness, detectClusters, detectIndividualChanges, exposureComparisons } from './analytics';
+import { completeness, detectClusters, detectIndividualChanges, exposureComparisons, symptomOnsets } from './analytics';
 import { extractObservations } from './extraction';
 import { DEMO_SCRIPTS } from '@/data/demoScripts';
 import type { Observation } from '@/types';
+import { addMinutes, DEMO_NOW } from './time';
 
 describe('seed dataset', () => {
   it('has 48 residents across four units', () => {
@@ -49,6 +50,32 @@ describe('exposure comparison', () => {
     const rows = exposureComparisons(gi, EXPOSURES, RESIDENT_EXPOSURES, RESIDENTS);
     for (const r of rows.slice(1)) expect(r.exposedSymptomatic).toBeLessThanOrEqual(3);
     expect((rows[1].exposedRate ?? 0) - (rows[1].unexposedRate ?? 0)).toBeLessThan(0.1);
+  });
+});
+
+describe('resident recovery', () => {
+  it('treats a symptom documented after recovery as a new onset', () => {
+    const residentId = STORY.gi[0];
+    const source = BASE_OBSERVATIONS.find((observation) => observation.residentId === residentId && observation.category === 'gi' && observation.flag === 'change')!;
+    const observedAt = addMinutes(DEMO_NOW, 5);
+    const renewedSymptom: Observation = { ...source, id: 'recovery-followup', observedAt, recordedAt: observedAt };
+    const recovery = {
+      id: 'recovery-test',
+      residentId,
+      domain: 'gi' as const,
+      recoveredAt: DEMO_NOW,
+      recordedBy: 's-priya',
+    };
+
+    const onsets = symptomOnsets(
+      [...BASE_OBSERVATIONS, renewedSymptom],
+      'gi',
+      addMinutes(DEMO_NOW, 10),
+      7,
+      [recovery],
+    );
+
+    expect(onsets.find((onset) => onset.residentId === residentId)?.observationId).toBe(renewedSymptom.id);
   });
 });
 

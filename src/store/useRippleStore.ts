@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Alert, Assessment, AssessmentItemResponse, AuditEvent, FamilyMessage, Note, Observation, ObservationDraft, PatternStatus, UserRole } from '@/types';
+import type { Alert, Assessment, AssessmentItemResponse, AuditEvent, FamilyMessage, Note, Observation, ObservationDraft, PatternCluster, PatternStatus, RecoveryRecord, UserRole } from '@/types';
 import { buildSeed, type SeedState } from '@/data/seed';
 import { BASE_OBSERVATIONS } from '@/data/observations';
 import { ROLE_USER, staffName } from '@/data/staff';
-import { residentName } from '@/data/residents';
+import { RESIDENT_BY_ID, RESIDENTS, residentName } from '@/data/residents';
 import { assessmentAlert, syncAlerts } from '@/lib/alerts';
+import { detectClusters } from '@/lib/analytics';
 import { KEY_ITEM_IDS } from '@/lib/assessmentItems';
 import { DEMO_NOW, addMinutes } from '@/lib/time';
 
@@ -38,6 +39,7 @@ interface Actions {
   assignAlert: (id: string, staffId: string) => void;
   addFollowUp: (id: string, text: string) => void;
   recordFamilyMessage: (alertId: string, residentId: string, message: string) => void;
+  markResidentRecovered: (residentId: string, domain: PatternCluster['domain'], patternId: string, note?: string) => void;
   resolveAlert: (id: string) => void;
   markAlertRead: (id: string) => void;
   clearNotifications: () => void;
@@ -119,7 +121,7 @@ export const useRippleStore = create<RippleState>()(
             observationIds: observations.map((o) => o.id),
           };
           const userObservations = [...state.userObservations, ...observations];
-          const sync = syncAlerts(state.alerts, [...BASE_OBSERVATIONS, ...userObservations], now, () => uid('al'));
+          const sync = syncAlerts(state.alerts, [...BASE_OBSERVATIONS, ...userObservations], now, () => uid('al'), state.recoveryRecords);
           let alerts = sync.alerts;
           let assessments = state.assessments;
           let createdAssessment: Assessment | undefined;
@@ -185,6 +187,60 @@ export const useRippleStore = create<RippleState>()(
           set((s) => ({
             familyMessages: [entry, ...s.familyMessages],
             audit: [audit('Recorded simulated family message', 'alert', alertId, `Demo only — message recorded for ${residentName(residentId)}; not delivered.`), ...s.audit],
+          }));
+        },
+        markResidentRecovered: (residentId, domain, patternId, note) => {
+          if (get().role === 'assessor') throw new Error('Only a nurse or Head Nurse can record resident recovery.');
+          if (!RESIDENT_BY_ID[residentId]) throw new Error(`Cannot record recovery: resident "${residentId}" was not found.`);
+          if (!patternId.startsWith(`pattern-${domain}-`)) throw new Error(`Cannot record recovery: pattern "${patternId}" does not match domain "${domain}".`);
+
+          const now = tick();
+          const state = get();
+          const recovery: RecoveryRecord = {
+            id: uid('rec'),
+            residentId,
+            domain,
+            recoveredAt: now,
+            recordedBy: state.userId(),
+            note: note?.trim() || undefined,
+          };
+          const recoveryRecords = [...state.recoveryRecords, recovery];
+          const sync = syncAlerts(
+            state.alerts,
+            [...BASE_OBSERVATIONS, ...state.userObservations],
+            now,
+            () => uid('al'),
+            recoveryRecords,
+          );
+          const activeClusterIds = new Set(detectClusters(
+            [...BASE_OBSERVATIONS, ...state.userObservations],
+            RESIDENTS,
+            now,
+            recoveryRecords,
+          ).map((cluster) => cluster.id));
+          const resolvedAlerts: Alert[] = [];
+          const alerts = sync.alerts.map((alert) => {
+            if (
+              alert.type !== 'facility_pattern' ||
+              alert.status === 'resolved' ||
+              !alert.patternId?.startsWith(`pattern-${domain}-`) ||
+              !alert.residentIds.includes(residentId) ||
+              activeClusterIds.has(alert.patternId)
+            ) {
+              return alert;
+            }
+            const resolved = { ...alert, status: 'resolved' as const, read: true };
+            resolvedAlerts.push(resolved);
+            return resolved;
+          });
+          const auditEvents = [
+            audit('Marked resident recovered', 'pattern', patternId, `${residentName(residentId)} — ${domain === 'gi' ? 'GI' : 'respiratory'} symptoms documented as returned to baseline.${recovery.note ? ` Note: ${recovery.note}` : ''}`),
+            ...resolvedAlerts.map((alert) => audit('Pattern alert closed after recovery', 'alert', alert.id, `${residentName(residentId)} recorded as recovered.`)),
+          ];
+          set((s) => ({
+            recoveryRecords,
+            alerts,
+            audit: [...auditEvents, ...s.audit],
           }));
         },
         resolveAlert: (id) => patchAlert(id, () => ({ status: 'resolved', read: true }), 'Marked reviewed (resolved)'),
@@ -253,6 +309,7 @@ export const useRippleStore = create<RippleState>()(
         userObservations: s.userObservations,
         alerts: s.alerts,
         familyMessages: s.familyMessages,
+        recoveryRecords: s.recoveryRecords,
         assessments: s.assessments,
         audit: s.audit,
         patternStatus: s.patternStatus,
