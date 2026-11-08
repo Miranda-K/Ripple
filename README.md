@@ -9,17 +9,30 @@ Ripple is a hackathon prototype of an explainable decision-support tool for seni
 
 > ⚠️ **Synthetic data only.** Ripple is *not* a diagnostic or autonomous outbreak-detection system. It does not compute risk scores, assign severity, or claim causes. Every insight is a hypothesis for human review.
 
-## Quick start
 
-Requires Node.js 18+ (tested on Node 26).
+## Getting started
+Requires Node.js 18+.
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # analytics + extraction unit tests
-npm run build      # typecheck + production build (dist/)
-npm run preview    # serve the production build
 ```
+
+## Scripts
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start the dev server with hot reload |
+| `npm test` | Run the unit tests |
+| `npm run build` | Type-check and build for production into `dist/` |
+| `npm run preview` | Serve the production build locally |
+
+## Building for production
+
+```bash
+npm run build
+npm run preview    # check the production build before deploying
+```
+
 
 No backend, API keys or network services are needed. Demo edits are saved to `localStorage` (key `ripple-demo-v1`), and **Demo Controls → Reset synthetic dataset** restores the exact seed.
 
