@@ -71,7 +71,7 @@ Open **Demo Controls** at any time to reset or load a scenario. Both scenarios a
 | Mobility | 1 or more documented falls, or 2 or more documented declines within 72 h |
 | Appetite | 2 or more of the 3 most recent intake records below 50% |
 | Pattern | 3 or more residents with a new symptom onset in the same domain within 72 h (grouped by unit first, then facility-wide) |
-| Exposure comparison | Every shared exposure in the 72 h before the first onset: a 2×2 table of attended / not attended vs symptomatic / not symptomatic. Unknown attendance is excluded and reported. A rate ratio is shown only when it can be calculated. |
+| Exposure comparison | Every shared exposure in the 72 hours before the first onset: a 2×2 table of attended / not attended vs symptomatic / not symptomatic. Unknown attendance is excluded and reported. A rate ratio is shown only when it can be calculated. |
 
 This is how missing and uncertain data are handled:
 - **Missing ≠ negative.** A missing record is shown as *No record*. *Not assessed* is stored explicitly, and data-completeness percentages are displayed.
