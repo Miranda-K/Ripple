@@ -73,7 +73,7 @@ Open **Demo Controls** at any time to reset or load a scenario. Both scenarios a
 | Pattern | 3 or more residents with a new symptom onset in the same domain within 72 h (grouped by unit first, then facility-wide) |
 | Exposure comparison | Every shared exposure in the 72 h before the first onset: a 2×2 table of attended / not attended vs symptomatic / not symptomatic. Unknown attendance is excluded and reported. A rate ratio is shown only when it can be calculated. |
 
-How missing and uncertain data are handled:
+This is how missing and uncertain data are handled:
 - **Missing ≠ negative.** A missing record is shown as *No record*. *Not assessed* is stored explicitly, and data-completeness percentages are displayed.
 - Each observation keeps its **event time** separate from its **entry time**, along with source, status (reported / observed / confirmed) and reviewer.
 
